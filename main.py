@@ -1,0 +1,71 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import sqlite3
+import json
+import os
+from datetime import datetime
+from etl import run_etl
+
+app = FastAPI(title="Financial Tracker API")
+
+# Enable CORS for frontend development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DB_PATH = 'portfolio.db'
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.get("/api/portfolio")
+async def get_portfolio():
+    """Fetch current portfolio holdings and latest values."""
+    conn = get_db_connection()
+    try:
+        # Get the latest snapshot from history
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM daily_history ORDER BY timestamp DESC LIMIT 1")
+        latest = cursor.fetchone()
+        
+        if not latest:
+            return {"status": "empty", "message": "No data found. Please run ETL."}
+        
+        return {
+            "timestamp": latest["timestamp"],
+            "total_value": latest["total_usd_value"],
+            "total_pnl": latest["total_pnl_usd"],
+            "assets": json.loads(latest["details"])
+        }
+    finally:
+        conn.close()
+
+@app.get("/api/history")
+async def get_history():
+    """Fetch historical data for charts."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT snapshot_date, total_usd_value, total_pnl_usd FROM daily_history ORDER BY snapshot_date ASC")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+@app.post("/api/etl/run")
+async def trigger_etl():
+    """Manually trigger the ETL process."""
+    try:
+        run_etl()
+        return {"status": "success", "message": "ETL process completed successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
