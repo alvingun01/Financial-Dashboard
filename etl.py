@@ -9,10 +9,10 @@ DB_PATH = 'portfolio.db'
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 def get_holdings():
-    """Extract current holdings from the database."""
+    """Extract current holdings and cost basis from the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT asset_id, symbol, amount, type FROM holdings")
+    cursor.execute("SELECT asset_id, symbol, amount, type, buy_price FROM holdings")
     holdings = cursor.fetchall()
     conn.close()
     return holdings
@@ -65,11 +65,12 @@ def fetch_stock_prices(tickers):
         return {}
 
 def transform_data(holdings, crypto_prices, stock_prices):
-    """Calculate the total value and breakdown of the portfolio."""
+    """Calculate the total value, PnL, and breakdown of the portfolio."""
     total_value = 0.0
+    total_pnl = 0.0
     breakdown = []
     
-    for asset_id, symbol, amount, asset_type in holdings:
+    for asset_id, symbol, amount, asset_type, buy_price in holdings:
         price = 0.0
         if asset_type == 'crypto':
             price = crypto_prices.get(asset_id, 0.0)
@@ -77,19 +78,26 @@ def transform_data(holdings, crypto_prices, stock_prices):
             price = stock_prices.get(asset_id, 0.0)
             
         asset_value = price * amount
+        cost_basis = buy_price * amount
+        asset_pnl = asset_value - cost_basis
+        
         total_value += asset_value
+        total_pnl += asset_pnl
+        
         breakdown.append({
             'asset_id': asset_id,
             'symbol': symbol,
             'amount': amount,
             'type': asset_type,
-            'price_usd': price,
-            'value_usd': asset_value
+            'buy_price': buy_price,
+            'current_price': price,
+            'value_usd': asset_value,
+            'pnl_usd': asset_pnl
         })
         
-    return total_value, breakdown
+    return total_value, total_pnl, breakdown
 
-def load_snapshot(total_value, breakdown):
+def load_snapshot(total_value, total_pnl, breakdown):
     """Load the daily snapshot into the history table, updating if today's entry exists."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -99,8 +107,8 @@ def load_snapshot(total_value, breakdown):
     
     # Using INSERT OR REPLACE (Upsert) to handle duplicates
     cursor.execute(
-        "INSERT OR REPLACE INTO daily_history (snapshot_date, total_usd_value, details) VALUES (?, ?, ?)",
-        (today, total_value, details_json)
+        "INSERT OR REPLACE INTO daily_history (snapshot_date, total_usd_value, total_pnl_usd, details) VALUES (?, ?, ?, ?)",
+        (today, total_value, total_pnl, details_json)
     )
     
     conn.commit()
@@ -124,11 +132,11 @@ def run_etl():
     print(f"Fetched {len(stock_prices)} stock prices from Yahoo Finance.")
     
     # 2. Transform
-    total_value, breakdown = transform_data(holdings, crypto_prices, stock_prices)
-    print(f"Transformed data. Total Portfolio Value: ${total_value:,.2f}")
+    total_value, total_pnl, breakdown = transform_data(holdings, crypto_prices, stock_prices)
+    print(f"Transformed data. Total Portfolio Value: ${total_value:,.2f} (PnL: ${total_pnl:,.2f})")
     
     # 3. Load
-    load_snapshot(total_value, breakdown)
+    load_snapshot(total_value, total_pnl, breakdown)
     print("Successfully loaded snapshot into history table.")
     print("ETL process complete.")
 
