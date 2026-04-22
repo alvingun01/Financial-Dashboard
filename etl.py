@@ -90,14 +90,17 @@ def transform_data(holdings, crypto_prices, stock_prices):
     return total_value, breakdown
 
 def load_snapshot(total_value, breakdown):
-    """Load the daily snapshot into the history table."""
+    """Load the daily snapshot into the history table, updating if today's entry exists."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    today = datetime.now().strftime('%Y-%m-%d')
     details_json = json.dumps(breakdown)
+    
+    # Using INSERT OR REPLACE (Upsert) to handle duplicates
     cursor.execute(
-        "INSERT INTO daily_history (total_usd_value, details) VALUES (?, ?)",
-        (total_value, details_json)
+        "INSERT OR REPLACE INTO daily_history (snapshot_date, total_usd_value, details) VALUES (?, ?, ?)",
+        (today, total_value, details_json)
     )
     
     conn.commit()

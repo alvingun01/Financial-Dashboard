@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS holdings (
 -- daily_history table: stores snapshots of portfolio value
 CREATE TABLE IF NOT EXISTS daily_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_date DATE UNIQUE NOT NULL, -- Ensure only one entry per day
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     total_usd_value REAL NOT NULL,
     details TEXT NOT NULL           -- JSON string containing breakdown per asset
