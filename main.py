@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import sqlite3
 import json
 import os
@@ -54,6 +55,33 @@ async def get_history():
         cursor.execute("SELECT snapshot_date, total_usd_value, total_pnl_usd FROM daily_history ORDER BY snapshot_date ASC")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+class Holding(BaseModel):
+    asset_id: str
+    symbol: str
+    amount: float
+    type: str  # 'crypto' or 'stock'
+    buy_price: float
+
+@app.post("/api/holdings")
+async def add_holding(holding: Holding):
+    """Add a new asset to the portfolio."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT OR REPLACE INTO holdings (asset_id, symbol, amount, type, buy_price) 
+               VALUES (?, ?, ?, ?, ?)""",
+            (holding.asset_id, holding.symbol, holding.amount, holding.type, holding.buy_price)
+        )
+        conn.commit()
+        # Automatically run ETL to update the dashboard values
+        run_etl()
+        return {"status": "success", "message": f"Added {holding.symbol} to portfolio."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 

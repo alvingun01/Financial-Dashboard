@@ -4,7 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { 
-  TrendingUp, TrendingDown, RefreshCw, Wallet, PieChart, Activity, ExternalLink 
+  TrendingUp, TrendingDown, RefreshCw, Wallet, PieChart, Activity, Plus, X 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -16,6 +16,14 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newAsset, setNewAsset] = useState({
+    asset_id: '',
+    symbol: '',
+    amount: '',
+    type: 'crypto',
+    buy_price: ''
+  });
 
   const fetchData = async () => {
     try {
@@ -48,6 +56,22 @@ function App() {
     }
   };
 
+  const handleAddAsset = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_BASE}/holdings`, {
+        ...newAsset,
+        amount: parseFloat(newAsset.amount),
+        buy_price: parseFloat(newAsset.buy_price)
+      });
+      setIsModalOpen(false);
+      setNewAsset({ asset_id: '', symbol: '', amount: '', type: 'crypto', buy_price: '' });
+      await fetchData();
+    } catch (error) {
+      alert("Failed to add asset. Check Asset ID and try again.");
+    }
+  };
+
   const formatCurrency = (val) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
@@ -70,14 +94,23 @@ function App() {
             Real-time analytics for your financial assets
           </p>
         </div>
-        <button 
-          onClick={handleSync}
-          disabled={syncing}
-          className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={syncing ? "animate-spin" : ""} />
-          {syncing ? "Syncing..." : "Sync ETL Data"}
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#00aaff]/10 border-[#00aaff]/30 hover:bg-[#00aaff]/20 transition-all"
+          >
+            <Plus size={18} />
+            Add Asset
+          </button>
+          <button 
+            onClick={handleSync}
+            disabled={syncing}
+            className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Syncing..." : "Sync ETL Data"}
+          </button>
+        </div>
       </header>
 
       {/* Hero Stats */}
@@ -227,6 +260,94 @@ function App() {
         </div>
       </div>
 
+      {/* Add Asset Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass w-full max-w-md p-8 relative">
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 text-[#94a3b8] hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            <h2 className="text-white mb-6">Add New Asset</h2>
+            <form onSubmit={handleAddAsset} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Asset Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['crypto', 'stock'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setNewAsset({...newAsset, type})}
+                      className={clsx("py-2 text-sm font-medium rounded-lg border transition-all", 
+                        newAsset.type === type ? "bg-[#00aaff]/10 border-[#00aaff] text-[#00aaff]" : "bg-white/5 border-white/10 text-[#94a3b8]")}
+                    >
+                      {type.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">
+                  {newAsset.type === 'crypto' ? 'CoinGecko ID (e.g. bitcoin)' : 'Ticker (e.g. MSFT)'}
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder={newAsset.type === 'crypto' ? 'bitcoin' : 'MSFT'}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
+                  value={newAsset.asset_id}
+                  onChange={e => setNewAsset({...newAsset, asset_id: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Display Symbol</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="BTC"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
+                  value={newAsset.symbol}
+                  onChange={e => setNewAsset({...newAsset, symbol: e.target.value.toUpperCase()})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Amount</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    required
+                    placeholder="0.0"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
+                    value={newAsset.amount}
+                    onChange={e => setNewAsset({...newAsset, amount: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Buy Price ($)</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    required
+                    placeholder="0.0"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
+                    value={newAsset.buy_price}
+                    onChange={e => setNewAsset({...newAsset, buy_price: e.target.value})}
+                  />
+                </div>
+              </div>
+              <button 
+                type="submit"
+                className="w-full bg-[#00aaff] text-white font-bold py-4 rounded-lg mt-4 hover:bg-[#0099ee] shadow-lg shadow-[#00aaff]/20 transition-all"
+              >
+                Save Asset
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
