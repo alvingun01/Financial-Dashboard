@@ -45,18 +45,16 @@ def fetch_stock_prices(tickers):
         prices = {}
         for ticker in tickers:
             try:
-                # Handle potential case where data might be a Series (one ticker) or DataFrame (multiple)
-                if len(tickers) == 1:
-                    val = data.iloc[-1]
-                else:
+                # Handle both single and multi-column DataFrames
+                if isinstance(data, (float, int)):
+                    val = data
+                elif ticker in data:
                     val = data[ticker].dropna().iloc[-1]
-                
-                if val is None or str(val) == 'nan':
-                    print(f"Warning: Price for {ticker} is NaN.")
-                    prices[ticker] = 0.0
                 else:
-                    prices[ticker] = float(val)
-            except (IndexError, KeyError):
+                    val = data.iloc[-1]
+                
+                prices[ticker] = float(val)
+            except (IndexError, KeyError, TypeError, ValueError):
                 print(f"Warning: No data found for {ticker}.")
                 prices[ticker] = 0.0
         return prices

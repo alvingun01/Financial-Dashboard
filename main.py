@@ -72,14 +72,33 @@ async def add_holding(holding: Holding):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT OR REPLACE INTO holdings (asset_id, symbol, amount, type, buy_price) 
-               VALUES (?, ?, ?, ?, ?)""",
+            """INSERT INTO holdings (asset_id, symbol, amount, type, buy_price) 
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(asset_id, type) DO UPDATE SET
+                 buy_price = (holdings.amount * holdings.buy_price + excluded.amount * excluded.buy_price) / (holdings.amount + excluded.amount),
+                 amount = holdings.amount + excluded.amount""",
             (holding.asset_id, holding.symbol, holding.amount, holding.type, holding.buy_price)
         )
         conn.commit()
         # Automatically run ETL to update the dashboard values
         run_etl()
         return {"status": "success", "message": f"Added {holding.symbol} to portfolio."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/holdings/{asset_type}/{asset_id}")
+async def delete_holding(asset_type: str, asset_id: str):
+    """Delete a holding from the portfolio."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM holdings WHERE asset_id = ? AND type = ?", (asset_id, asset_type))
+        conn.commit()
+        # Automatically run ETL to update the dashboard values
+        run_etl()
+        return {"status": "success", "message": f"Deleted {asset_id} from portfolio."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
 :root {
@@ -57,18 +59,6 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.6s ease forwards;
-}
-
-/* Layout */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-}
-
-.grid {
-  display: grid;
-  gap: 1.5rem;
 }
 
 /* Typography */

@@ -72,6 +72,16 @@ function App() {
     }
   };
 
+  const handleDeleteAsset = async (assetType, assetId) => {
+    if (!window.confirm(`Are you sure you want to delete ${assetId}?`)) return;
+    try {
+      await axios.delete(`${API_BASE}/holdings/${assetType}/${assetId}`);
+      await fetchData();
+    } catch (error) {
+      alert("Failed to delete asset.");
+    }
+  };
+
   const formatCurrency = (val) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
@@ -97,18 +107,25 @@ function App() {
         <div className="flex gap-4">
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#00aaff]/10 border-[#00aaff]/30 hover:bg-[#00aaff]/20 transition-all"
+            className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#00aaff] text-white hover:bg-[#0099ee] transition-all"
           >
             <Plus size={18} />
             Add Asset
+          </button>
+          <button 
+            onClick={fetchData}
+            className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all"
+          >
+            <RefreshCw size={18} />
+            Refresh
           </button>
           <button 
             onClick={handleSync}
             disabled={syncing}
             className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all disabled:opacity-50"
           >
-            <RefreshCw size={18} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Syncing..." : "Sync ETL Data"}
+            <Activity size={18} className={syncing ? "animate-spin text-[#00aaff]" : "text-[#00aaff]"} />
+            {syncing ? "Syncing..." : "Run ETL Sync"}
           </button>
         </div>
       </header>
@@ -229,6 +246,7 @@ function App() {
                 <th className="px-6 py-4 text-right">Market Price</th>
                 <th className="px-6 py-4 text-right">Total Value</th>
                 <th className="px-6 py-4 text-right">PnL</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -252,6 +270,15 @@ function App() {
                   <td className="px-6 py-5 text-right font-bold">{formatCurrency(asset.value_usd)}</td>
                   <td className={clsx("px-6 py-5 text-right font-bold", asset.pnl_usd >= 0 ? "text-[#2ecc71]" : "text-[#e74c3c]")}>
                     {asset.pnl_usd >= 0 ? "+" : ""}{formatCurrency(asset.pnl_usd)}
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button 
+                      onClick={() => handleDeleteAsset(asset.type, asset.asset_id)}
+                      className="text-[#94a3b8] hover:text-[#e74c3c] transition-colors p-2"
+                      title="Delete Asset"
+                    >
+                      <X size={18} />
+                    </button>
                   </td>
                 </tr>
               ))}
