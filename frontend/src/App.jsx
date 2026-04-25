@@ -9,7 +9,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://localhost:9000/api";
 
 function App() {
   const [portfolio, setPortfolio] = useState(null);
@@ -17,6 +17,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  const [sellAsset, setSellAsset] = useState(null);
+  const [sellAmount, setSellAmount] = useState('');
   const [newAsset, setNewAsset] = useState({
     asset_id: '',
     symbol: '',
@@ -79,6 +82,22 @@ function App() {
       await fetchData();
     } catch (error) {
       alert("Failed to delete asset.");
+    }
+  };
+
+  const handleSellAsset = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_BASE}/holdings/sell`, {
+        asset_id: sellAsset.asset_id,
+        type: sellAsset.type,
+        amount: parseFloat(sellAmount)
+      });
+      setIsSellModalOpen(false);
+      setSellAmount('');
+      await fetchData();
+    } catch (error) {
+      alert(error.response?.data?.detail || "Failed to sell asset.");
     }
   };
 
@@ -271,11 +290,21 @@ function App() {
                   <td className={clsx("px-6 py-5 text-right font-bold", asset.pnl_usd >= 0 ? "text-[#2ecc71]" : "text-[#e74c3c]")}>
                     {asset.pnl_usd >= 0 ? "+" : ""}{formatCurrency(asset.pnl_usd)}
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-6 py-5 text-right flex justify-end gap-2">
+                    <button 
+                      onClick={() => {
+                        setSellAsset(asset);
+                        setIsSellModalOpen(true);
+                      }}
+                      className="text-[#94a3b8] hover:text-[#00aaff] transition-colors p-2"
+                      title="Sell Portion"
+                    >
+                      <TrendingDown size={18} />
+                    </button>
                     <button 
                       onClick={() => handleDeleteAsset(asset.type, asset.asset_id)}
                       className="text-[#94a3b8] hover:text-[#e74c3c] transition-colors p-2"
-                      title="Delete Asset"
+                      title="Delete Entire Holding"
                     >
                       <X size={18} />
                     </button>
@@ -370,6 +399,45 @@ function App() {
                 className="w-full bg-[#00aaff] text-white font-bold py-4 rounded-lg mt-4 hover:bg-[#0099ee] shadow-lg shadow-[#00aaff]/20 transition-all"
               >
                 Save Asset
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sell Asset Modal */}
+      {isSellModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass w-full max-w-md p-8 relative">
+            <button 
+              onClick={() => setIsSellModalOpen(false)}
+              className="absolute top-4 right-4 text-[#94a3b8] hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            <h2 className="text-white mb-2">Sell {sellAsset?.symbol}</h2>
+            <p className="text-[#94a3b8] mb-6 text-sm">
+              Current Balance: <span className="text-white font-bold">{sellAsset?.amount} {sellAsset?.symbol}</span>
+            </p>
+            <form onSubmit={handleSellAsset} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Amount to Sell</label>
+                <input 
+                  type="number" 
+                  step="any"
+                  required
+                  max={sellAsset?.amount}
+                  placeholder="0.0"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
+                  value={sellAmount}
+                  onChange={e => setSellAmount(e.target.value)}
+                />
+              </div>
+              <button 
+                type="submit"
+                className="w-full bg-[#e74c3c] text-white font-bold py-4 rounded-lg mt-4 hover:bg-[#c0392b] shadow-lg shadow-[#e74c3c]/20 transition-all"
+              >
+                Confirm Sale
               </button>
             </form>
           </div>

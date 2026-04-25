@@ -104,6 +104,43 @@ async def delete_holding(asset_type: str, asset_id: str):
     finally:
         conn.close()
 
+class SellRequest(BaseModel):
+    asset_id: str
+    type: str
+    amount: float
+
+@app.post("/api/holdings/sell")
+async def sell_holding(request: SellRequest):
+    """Sell a portion of a holding."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Check current amount
+        cursor.execute("SELECT amount FROM holdings WHERE asset_id = ? AND type = ?", (request.asset_id, request.type))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        current_amount = row["amount"]
+        if request.amount > current_amount:
+            raise HTTPException(status_code=400, detail="Insufficient balance to sell")
+        
+        new_amount = current_amount - request.amount
+        
+        if new_amount <= 0.00000001: # Handle precision
+            cursor.execute("DELETE FROM holdings WHERE asset_id = ? AND type = ?", (request.asset_id, request.type))
+        else:
+            cursor.execute("UPDATE holdings SET amount = ? WHERE asset_id = ? AND type = ?", (new_amount, request.asset_id, request.type))
+        
+        conn.commit()
+        run_etl()
+        return {"status": "success", "message": f"Sold {request.amount} of {request.asset_id}."}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 @app.post("/api/etl/run")
 async def trigger_etl():
     """Manually trigger the ETL process."""
@@ -115,4 +152,4 @@ async def trigger_etl():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=9000)
