@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
-import { 
-  TrendingUp, TrendingDown, RefreshCw, Wallet, PieChart, Activity, Plus, X 
+import {
+  TrendingUp, TrendingDown, RefreshCw, Wallet, PieChart, Activity, Plus, X
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import AssetList from './Component/AssetList.jsx';
+import { formatCurrency } from './Utils.js';
+
 
 const API_BASE = "http://localhost:9000/api";
 
@@ -28,7 +30,7 @@ function App() {
     buy_price: ''
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [portRes, histRes] = await Promise.all([
         axios.get(`${API_BASE}/portfolio`),
@@ -41,11 +43,16 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const initFetch = async () => {
+      // Defer execution to avoid synchronous state updates during the render phase
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fetchData();
+    };
+    initFetch();
+  }, [fetchData]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -53,6 +60,7 @@ function App() {
       await axios.post(`${API_BASE}/etl/run`);
       await fetchData();
     } catch (error) {
+      console.error(error);
       alert("Failed to sync ETL");
     } finally {
       setSyncing(false);
@@ -71,6 +79,7 @@ function App() {
       setNewAsset({ asset_id: '', symbol: '', amount: '', type: 'crypto', buy_price: '' });
       await fetchData();
     } catch (error) {
+      console.error(error);
       alert("Failed to add asset. Check Asset ID and try again.");
     }
   };
@@ -81,6 +90,7 @@ function App() {
       await axios.delete(`${API_BASE}/holdings/${assetType}/${assetId}`);
       await fetchData();
     } catch (error) {
+      console.error(error);
       alert("Failed to delete asset.");
     }
   };
@@ -101,8 +111,6 @@ function App() {
     }
   };
 
-  const formatCurrency = (val) => 
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-[#05070a]">
@@ -124,21 +132,21 @@ function App() {
           </p>
         </div>
         <div className="flex gap-4">
-          <button 
+          <button
             onClick={() => setIsModalOpen(true)}
             className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold bg-[#00aaff] text-white hover:bg-[#0099ee] transition-all"
           >
             <Plus size={18} />
             Add Asset
           </button>
-          <button 
+          <button
             onClick={fetchData}
             className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all"
           >
             <RefreshCw size={18} />
             Refresh
           </button>
-          <button 
+          <button
             onClick={handleSync}
             disabled={syncing}
             className="glass flex items-center gap-2 px-6 py-3 text-sm font-semibold hover:bg-white/10 transition-all disabled:opacity-50"
@@ -200,48 +208,48 @@ function App() {
             <AreaChart data={history}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00aaff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00aaff" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#00aaff" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#00aaff" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorPnl" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2ecc71" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#2ecc71" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#2ecc71" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#2ecc71" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis 
-                dataKey="snapshot_date" 
-                stroke="#475569" 
-                fontSize={12} 
-                tickLine={false} 
+              <XAxis
+                dataKey="snapshot_date"
+                stroke="#475569"
+                fontSize={12}
+                tickLine={false}
                 axisLine={false}
                 tickFormatter={(val) => val.split('-').slice(1).join('/')}
               />
-              <YAxis 
-                stroke="#475569" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
-                tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`}
+              <YAxis
+                stroke="#475569"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
               />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
                 itemStyle={{ color: '#fff' }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="total_usd_value" 
-                stroke="#00aaff" 
-                fillOpacity={1} 
-                fill="url(#colorValue)" 
+              <Area
+                type="monotone"
+                dataKey="total_usd_value"
+                stroke="#00aaff"
+                fillOpacity={1}
+                fill="url(#colorValue)"
                 strokeWidth={3}
               />
-              <Area 
-                type="monotone" 
-                dataKey="total_pnl_usd" 
-                stroke="#2ecc71" 
-                fillOpacity={1} 
-                fill="url(#colorPnl)" 
+              <Area
+                type="monotone"
+                dataKey="total_pnl_usd"
+                stroke="#2ecc71"
+                fillOpacity={1}
+                fill="url(#colorPnl)"
                 strokeWidth={2}
                 strokeDasharray="5 5"
               />
@@ -251,76 +259,13 @@ function App() {
       </div>
 
       {/* Assets Table */}
-      <div className="glass overflow-hidden mb-10">
-        <div className="p-6 border-b border-white/10">
-          <h2 className="text-white">Your Assets</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-white/5 text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                <th className="px-6 py-4">Asset</th>
-                <th className="px-6 py-4 text-right">Holdings</th>
-                <th className="px-6 py-4 text-right">Avg Price</th>
-                <th className="px-6 py-4 text-right">Market Price</th>
-                <th className="px-6 py-4 text-right">Total Value</th>
-                <th className="px-6 py-4 text-right">PnL</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {portfolio?.assets?.map((asset, i) => (
-                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold", 
-                        asset.type === 'crypto' ? "bg-orange-500/20 text-orange-500" : "bg-blue-500/20 text-blue-500")}>
-                        {asset.symbol[0]}
-                      </div>
-                      <div>
-                        <div className="font-semibold">{asset.symbol}</div>
-                        <div className="text-xs text-[#94a3b8] capitalize">{asset.type}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-right font-medium">{asset.amount}</td>
-                  <td className="px-6 py-5 text-right text-[#94a3b8]">{formatCurrency(asset.buy_price)}</td>
-                  <td className="px-6 py-5 text-right font-medium">{formatCurrency(asset.current_price)}</td>
-                  <td className="px-6 py-5 text-right font-bold">{formatCurrency(asset.value_usd)}</td>
-                  <td className={clsx("px-6 py-5 text-right font-bold", asset.pnl_usd >= 0 ? "text-[#2ecc71]" : "text-[#e74c3c]")}>
-                    {asset.pnl_usd >= 0 ? "+" : ""}{formatCurrency(asset.pnl_usd)}
-                  </td>
-                  <td className="px-6 py-5 text-right flex justify-end gap-2">
-                    <button 
-                      onClick={() => {
-                        setSellAsset(asset);
-                        setIsSellModalOpen(true);
-                      }}
-                      className="text-[#94a3b8] hover:text-[#00aaff] transition-colors p-2"
-                      title="Sell Portion"
-                    >
-                      <TrendingDown size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteAsset(asset.type, asset.asset_id)}
-                      className="text-[#94a3b8] hover:text-[#e74c3c] transition-colors p-2"
-                      title="Delete Entire Holding"
-                    >
-                      <X size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AssetList portfolio={portfolio} setSellAsset={setSellAsset} setIsSellModalOpen={setIsSellModalOpen} handleDeleteAsset={handleDeleteAsset} />
 
       {/* Add Asset Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="glass w-full max-w-md p-8 relative">
-            <button 
+            <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 text-[#94a3b8] hover:text-white"
             >
@@ -335,8 +280,8 @@ function App() {
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setNewAsset({...newAsset, type})}
-                      className={clsx("py-2 text-sm font-medium rounded-lg border transition-all", 
+                      onClick={() => setNewAsset({ ...newAsset, type })}
+                      className={clsx("py-2 text-sm font-medium rounded-lg border transition-all",
                         newAsset.type === type ? "bg-[#00aaff]/10 border-[#00aaff] text-[#00aaff]" : "bg-white/5 border-white/10 text-[#94a3b8]")}
                     >
                       {type.toUpperCase()}
@@ -348,53 +293,53 @@ function App() {
                 <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">
                   {newAsset.type === 'crypto' ? 'CoinGecko ID (e.g. bitcoin)' : 'Ticker (e.g. MSFT)'}
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder={newAsset.type === 'crypto' ? 'bitcoin' : 'MSFT'}
                   className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
                   value={newAsset.asset_id}
-                  onChange={e => setNewAsset({...newAsset, asset_id: e.target.value})}
+                  onChange={e => setNewAsset({ ...newAsset, asset_id: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Display Symbol</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder="BTC"
                   className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
                   value={newAsset.symbol}
-                  onChange={e => setNewAsset({...newAsset, symbol: e.target.value.toUpperCase()})}
+                  onChange={e => setNewAsset({ ...newAsset, symbol: e.target.value.toUpperCase() })}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Amount</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="any"
                     required
                     placeholder="0.0"
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
                     value={newAsset.amount}
-                    onChange={e => setNewAsset({...newAsset, amount: e.target.value})}
+                    onChange={e => setNewAsset({ ...newAsset, amount: e.target.value })}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Buy Price ($)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="any"
                     required
                     placeholder="0.0"
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-[#00aaff]/50"
                     value={newAsset.buy_price}
-                    onChange={e => setNewAsset({...newAsset, buy_price: e.target.value})}
+                    onChange={e => setNewAsset({ ...newAsset, buy_price: e.target.value })}
                   />
                 </div>
               </div>
-              <button 
+              <button
                 type="submit"
                 className="w-full bg-[#00aaff] text-white font-bold py-4 rounded-lg mt-4 hover:bg-[#0099ee] shadow-lg shadow-[#00aaff]/20 transition-all"
               >
@@ -409,7 +354,7 @@ function App() {
       {isSellModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="glass w-full max-w-md p-8 relative">
-            <button 
+            <button
               onClick={() => setIsSellModalOpen(false)}
               className="absolute top-4 right-4 text-[#94a3b8] hover:text-white"
             >
@@ -422,8 +367,8 @@ function App() {
             <form onSubmit={handleSellAsset} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#94a3b8] mb-1 uppercase">Amount to Sell</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="any"
                   required
                   max={sellAsset?.amount}
@@ -433,7 +378,7 @@ function App() {
                   onChange={e => setSellAmount(e.target.value)}
                 />
               </div>
-              <button 
+              <button
                 type="submit"
                 className="w-full bg-[#e74c3c] text-white font-bold py-4 rounded-lg mt-4 hover:bg-[#c0392b] shadow-lg shadow-[#e74c3c]/20 transition-all"
               >
