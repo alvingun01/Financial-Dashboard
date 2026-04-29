@@ -1,7 +1,9 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { TrendingDown, X } from 'lucide-react';
+import { TrendingDown, X, ExternalLink } from 'lucide-react';
 import { formatCurrency } from '../Utils.js';
+
 function AssetList({ portfolio, setSellAsset, setIsSellModalOpen, handleDeleteAsset }) {
     return (
         <>
@@ -26,16 +28,22 @@ function AssetList({ portfolio, setSellAsset, setIsSellModalOpen, handleDeleteAs
                             {portfolio?.assets?.map((asset, i) => (
                                 <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                                     <td className="px-6 py-5">
-                                        <div className="flex items-center gap-3">
-                                            <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                                                asset.type === 'crypto' ? "bg-orange-500/20 text-orange-500" : "bg-blue-500/20 text-blue-500")}>
-                                                {asset.symbol[0]}
-                                            </div>
-                                            <div>
-                                                <div className="font-semibold">{asset.symbol}</div>
-                                                <div className="text-xs text-[#94a3b8] capitalize">{asset.type}</div>
-                                            </div>
-                                        </div>
+                                            <Link 
+                                                to={`/asset/${asset.type}/${asset.asset_id}`}
+                                                className="hover:opacity-70 transition-opacity group flex items-center gap-3"
+                                            >
+                                                <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                                                    asset.type === 'crypto' ? "bg-orange-500/20 text-orange-500" : "bg-blue-500/20 text-blue-500")}>
+                                                    {asset.symbol[0]}
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold flex items-center gap-1">
+                                                        {asset.symbol}
+                                                        <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </div>
+                                                    <div className="text-xs text-[#94a3b8] capitalize">{asset.type}</div>
+                                                </div>
+                                            </Link>
                                     </td>
                                     <td className="px-6 py-5 text-right font-medium">{asset.amount}</td>
                                     <td className="px-6 py-5 text-right text-[#94a3b8]">{formatCurrency(asset.buy_price)}</td>
