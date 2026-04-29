@@ -190,6 +190,19 @@ async def sell_holding(request: SellRequest):
     finally:
         conn.close()
 
+@app.get("/api/market/rankings")
+async def get_market_rankings(index: str = "SP500", limit: int = 50):
+    """Fetch top-ranked stocks from a specific market index."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        query = "SELECT * FROM market_index_scores WHERE index_name = ? ORDER BY score DESC LIMIT ?"
+        cursor.execute(query, (index, limit))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
 @app.post("/api/etl/run")
 async def trigger_etl():
     """Manually trigger the ETL process."""
