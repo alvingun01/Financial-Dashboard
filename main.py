@@ -1,3 +1,4 @@
+import yfinance
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,6 +7,7 @@ import json
 import os
 from datetime import datetime
 from etl import run_etl
+import requests
 
 app = FastAPI(title="Financial Tracker API")
 
@@ -87,6 +89,53 @@ async def add_holding(holding: Holding):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+@app.get("/api/holdings/{asset_type}/{asset_id}")
+async def get_asset_details(asset_type: str, asset_id: str):
+    """Fetch full details for an asset, including metadata, history, and current position."""
+    try:
+        history_data = []
+        if asset_type == "stock":
+            ticker = yfinance.Ticker(asset_id)
+            info = ticker.info
+            # Fetch 1 month of history for the chart
+            hist = ticker.history(period="1mo").reset_index()
+            # Ensure Date is a string for JSON serialization
+            if not hist.empty:
+                hist['Date'] = hist['Date'].dt.strftime('%Y-%m-%d')
+                history_data = hist.to_dict(orient="records")
+        else:
+            # CoinGecko for Crypto
+            url = f"https://api.coingecko.com/api/v3/coins/{asset_id}"
+            info = requests.get(url).json()
+            # Basic chart data from CoinGecko (30 days)
+            chart_url = f"https://api.coingecko.com/api/v3/coins/{asset_id}/market_chart"
+            chart_res = requests.get(chart_url, params={'vs_currency': 'usd', 'days': '30', 'interval': 'daily'})
+            if chart_res.status_code == 200:
+                # Format: [[timestamp, price], ...] -> [{"Date": "...", "Close": ...}, ...]
+                prices = chart_res.json().get('prices', [])
+                history_data = [
+                    {
+                        "Date": datetime.fromtimestamp(p[0]/1000).strftime('%Y-%m-%d'),
+                        "Close": p[1]
+                    } for p in prices
+                ]
+
+        # Fetch your specific holding from the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM holdings WHERE asset_id = ? AND type = ?", (asset_id, asset_type))
+        holding = cursor.fetchone()
+        conn.close()
+
+        return {
+            "info": info,
+            "history": history_data,
+            "holding": dict(holding) if holding else None
+        }
+    except Exception as e:
+        print(f"Error in get_asset_details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/holdings/{asset_type}/{asset_id}")
 async def delete_holding(asset_type: str, asset_id: str):
